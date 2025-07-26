@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Copy, Download, Undo, Redo, RotateCcw, Eye, Edit } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Undo, Redo, RotateCcw, Eye, Edit, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { OutlineSection, OutlineData } from '@/types/outline';
 
