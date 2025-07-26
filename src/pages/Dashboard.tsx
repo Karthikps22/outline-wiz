@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,25 +88,64 @@ const Dashboard = () => {
         tone: tone
       });
       
-      console.log('API Response:', data);
+      console.log('Full API Response:', JSON.stringify(data, null, 2));
+      
+      // Check if we have the expected data structure
+      if (!data.generated_content) {
+        console.error('No generated_content in API response');
+        throw new Error('Invalid API response format');
+      }
       
       // Parse the generated_content into structured outline format
-      const parsedOutline = parseGeneratedContent(data.generated_content, data.topic);
+      const parsedOutline = parseGeneratedContent(data.generated_content, data.topic || keyword);
       
-      navigate('/editor', { 
-        state: { 
-          keyword, 
-          outputType, 
-          audience, 
-          tone,
-          outline: parsedOutline
-        } 
+      console.log('Parsed outline:', JSON.stringify(parsedOutline, null, 2));
+      
+      // Ensure we have sections before navigating
+      if (!parsedOutline.sections || parsedOutline.sections.length === 0) {
+        console.warn('No sections found in parsed outline');
+        // Create a fallback outline with the raw content
+        const fallbackOutline = {
+          title: data.topic || keyword,
+          sections: [{
+            id: 'section-0',
+            level: 1,
+            title: 'Generated Content',
+            brief: data.generated_content
+          }]
+        };
+        
+        navigate('/editor', { 
+          state: { 
+            keyword, 
+            outputType, 
+            audience, 
+            tone,
+            outline: fallbackOutline
+          } 
+        });
+      } else {
+        navigate('/editor', { 
+          state: { 
+            keyword, 
+            outputType, 
+            audience, 
+            tone,
+            outline: parsedOutline
+          } 
+        });
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Outline generated successfully! Redirecting to editor...',
       });
+      
     } catch (error) {
       console.error('Error generating outline:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate outline. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to generate outline. Please try again.',
         variant: 'destructive'
       });
     } finally {

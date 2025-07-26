@@ -19,15 +19,30 @@ const OutlineEditor = () => {
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
   useEffect(() => {
+    console.log('OutlineEditor - location.state:', location.state);
+    
     if (location.state?.outline) {
       const initialOutline = location.state.outline;
+      console.log('Received outline:', initialOutline);
+      
       setOutline(initialOutline);
       setHistory([initialOutline]);
       setCurrentHistoryIndex(0);
+      
+      toast({
+        title: 'Outline loaded',
+        description: 'Your generated outline is ready for editing!',
+      });
     } else {
+      console.warn('No outline data found in location state');
+      toast({
+        title: 'No outline data',
+        description: 'Redirecting to dashboard...',
+        variant: 'destructive'
+      });
       navigate('/');
     }
-  }, [location.state, navigate]);
+  }, [location.state, navigate, toast]);
 
   const addToHistory = (newOutline: OutlineData) => {
     const newHistory = history.slice(0, currentHistoryIndex + 1);
@@ -129,8 +144,17 @@ const OutlineEditor = () => {
   };
 
   if (!outline) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading outline...</p>
+        </div>
+      </div>
+    );
   }
+
+  console.log('Rendering outline with', outline.sections.length, 'sections');
 
   return (
     <div className="min-h-screen bg-background">
@@ -207,50 +231,56 @@ const OutlineEditor = () => {
 
           {/* Sections */}
           <div className="space-y-4">
-            {outline.sections.map((section) => (
-              <div key={section.id} className="border-l-2 border-border pl-4">
-                <div className={`flex items-start space-x-3 ${section.level > 1 ? 'ml-6' : ''}`}>
-                  <div className="flex-1">
-                    {previewMode ? (
-                      <div>
-                        <div 
-                          className={`font-semibold text-foreground ${
-                            section.level === 1 ? 'text-2xl' :
-                            section.level === 2 ? 'text-xl' :
-                            section.level === 3 ? 'text-lg' : 'text-base'
-                          }`}
-                        >
-                          {section.title}
+            {outline.sections.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No sections found. The outline might need manual editing.</p>
+              </div>
+            ) : (
+              outline.sections.map((section) => (
+                <div key={section.id} className="border-l-2 border-border pl-4">
+                  <div className={`flex items-start space-x-3 ${section.level > 1 ? 'ml-6' : ''}`}>
+                    <div className="flex-1">
+                      {previewMode ? (
+                        <div>
+                          <div 
+                            className={`font-semibold text-foreground ${
+                              section.level === 1 ? 'text-2xl' :
+                              section.level === 2 ? 'text-xl' :
+                              section.level === 3 ? 'text-lg' : 'text-base'
+                            }`}
+                          >
+                            {section.title}
+                          </div>
+                          {section.brief && (
+                            <p className="text-muted-foreground mt-2">{section.brief}</p>
+                          )}
                         </div>
-                        {section.brief && (
-                          <p className="text-muted-foreground mt-2">{section.brief}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Input
-                          value={section.title}
-                          onChange={(e) => updateSection(section.id, 'title', e.target.value)}
-                          className={`font-semibold ${
-                            section.level === 1 ? 'text-2xl' :
-                            section.level === 2 ? 'text-xl' :
-                            section.level === 3 ? 'text-lg' : 'text-base'
-                          }`}
-                          placeholder="Section title..."
-                        />
-                        <Textarea
-                          value={section.brief || ''}
-                          onChange={(e) => updateSection(section.id, 'brief', e.target.value)}
-                          placeholder="Brief description (optional)..."
-                          rows={2}
-                          className="text-muted-foreground"
-                        />
-                      </div>
-                    )}
+                      ) : (
+                        <div className="space-y-2">
+                          <Input
+                            value={section.title}
+                            onChange={(e) => updateSection(section.id, 'title', e.target.value)}
+                            className={`font-semibold ${
+                              section.level === 1 ? 'text-2xl' :
+                              section.level === 2 ? 'text-xl' :
+                              section.level === 3 ? 'text-lg' : 'text-base'
+                            }`}
+                            placeholder="Section title..."
+                          />
+                          <Textarea
+                            value={section.brief || ''}
+                            onChange={(e) => updateSection(section.id, 'brief', e.target.value)}
+                            placeholder="Brief description (optional)..."
+                            rows={2}
+                            className="text-muted-foreground"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
       </div>
