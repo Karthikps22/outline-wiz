@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,18 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Copy, Download, Undo, Redo, RotateCcw, Eye, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface OutlineSection {
-  id: string;
-  level: number;
-  title: string;
-  brief?: string;
-}
-
-interface OutlineData {
-  title: string;
-  sections: OutlineSection[];
-}
+import { OutlineSection, OutlineData } from '@/types/outline';
 
 const OutlineEditor = () => {
   const location = useLocation();

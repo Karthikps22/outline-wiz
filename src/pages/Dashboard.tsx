@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +7,7 @@ import { Loader2, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/services/api';
+import { parseGeneratedContent } from '@/utils/outlineParser';
 
 const Dashboard = () => {
   const [keyword, setKeyword] = useState('');
@@ -87,13 +87,18 @@ const Dashboard = () => {
         tone: tone
       });
       
+      console.log('API Response:', data);
+      
+      // Parse the generated_content into structured outline format
+      const parsedOutline = parseGeneratedContent(data.generated_content, data.topic);
+      
       navigate('/editor', { 
         state: { 
           keyword, 
           outputType, 
           audience, 
           tone,
-          outline: data.outline
+          outline: parsedOutline
         } 
       });
     } catch (error) {
