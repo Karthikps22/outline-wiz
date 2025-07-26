@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card';
 import { Loader2, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+import { apiService } from '@/services/api';
 
 const Dashboard = () => {
   const [keyword, setKeyword] = useState('');
@@ -15,7 +17,9 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const outputTypes = [
     { value: 'outline', label: 'Outline Only' },
@@ -42,17 +46,22 @@ const Dashboard = () => {
   const handleKeywordChange = async (value: string) => {
     setKeyword(value);
     if (value.length > 2) {
-      // Mock API call for suggestions
-      setTimeout(() => {
-        setSuggestions([
-          `${value} tips`,
-          `${value} guide`,
-          `${value} best practices`,
-          `how to ${value}`,
-          `${value} strategies`
-        ]);
+      setIsLoadingSuggestions(true);
+      try {
+        const suggestions = await apiService.getSuggestions(value);
+        setSuggestions(suggestions);
         setShowSuggestions(true);
-      }, 300);
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch keyword suggestions',
+          variant: 'destructive'
+        });
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
     } else {
       setShowSuggestions(false);
     }
@@ -60,46 +69,43 @@ const Dashboard = () => {
 
   const handleGenerateOutline = async () => {
     if (!keyword || !outputType || !audience || !tone) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all fields before generating an outline',
+        variant: 'destructive'
+      });
       return;
     }
 
     setIsLoading(true);
     
-    // Mock API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const data = await apiService.generateOutline({
+        topic: keyword,
+        output_type: outputType,
+        audience: audience,
+        tone: tone
+      });
+      
       navigate('/editor', { 
         state: { 
           keyword, 
           outputType, 
           audience, 
           tone,
-          outline: {
-            title: `Complete Guide to ${keyword}`,
-            sections: [
-              {
-                id: '1',
-                level: 1,
-                title: 'Introduction',
-                brief: 'Overview of the topic and what readers will learn'
-              },
-              {
-                id: '2',
-                level: 1,
-                title: 'Getting Started',
-                brief: 'Basic concepts and prerequisites'
-              },
-              {
-                id: '3',
-                level: 1,
-                title: 'Advanced Techniques',
-                brief: 'In-depth strategies and best practices'
-              }
-            ]
-          }
+          outline: data.outline
         } 
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Error generating outline:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate outline. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectSuggestion = (suggestion: string) => {
@@ -128,13 +134,16 @@ const Dashboard = () => {
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                {isLoadingSuggestions && (
+                  <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 animate-spin" />
+                )}
                 <Input
                   id="keyword"
                   type="text"
                   placeholder="Enter your blog topic or main keyword..."
                   value={keyword}
                   onChange={(e) => handleKeywordChange(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-10"
                 />
                 {showSuggestions && suggestions.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-md shadow-lg">
