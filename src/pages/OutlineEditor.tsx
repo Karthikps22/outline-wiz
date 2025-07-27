@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { OutlineData } from '@/types/outline';
 import ReactMarkdown from 'react-markdown';
+import AutocompleteInput from '@/components/AutocompleteInput';
 
 // Helper component to render headings with correct tag based on level
 const Heading = ({ level, children }: { level: number; children: React.ReactNode }) => {
@@ -53,6 +55,7 @@ const OutlineEditor = () => {
 
   const [isEditingOutline, setIsEditingOutline] = useState(false);
   const [editableOutlineText, setEditableOutlineText] = useState('');
+  const [originalOutlineText, setOriginalOutlineText] = useState('');
 
   // Visualization modes - Tree & Markdown only
   const VISUALIZATION_MODES = ['Tree View', 'Markdown'];
@@ -64,7 +67,9 @@ const OutlineEditor = () => {
       setOutline(initialOutline);
       setHistory([initialOutline]);
       setCurrentHistoryIndex(0);
-      setEditableOutlineText(generateOutlineText(initialOutline));
+      const initialText = generateOutlineText(initialOutline);
+      setEditableOutlineText(initialText);
+      setOriginalOutlineText(initialText);
       toast({
         title: 'Outline loaded',
         description: 'Your generated outline is ready for editing!',
@@ -87,34 +92,53 @@ const OutlineEditor = () => {
   };
 
   const undo = () => {
-    if (isEditingOutline) return;
     if (currentHistoryIndex > 0) {
       const prevIndex = currentHistoryIndex - 1;
       const prevOutline = history[prevIndex];
       setOutline(prevOutline);
-      setEditableOutlineText(generateOutlineText(prevOutline));
+      const prevText = generateOutlineText(prevOutline);
+      setEditableOutlineText(prevText);
+      setOriginalOutlineText(prevText);
       setCurrentHistoryIndex(prevIndex);
+      
+      // Exit edit mode if currently editing
+      if (isEditingOutline) {
+        setIsEditingOutline(false);
+      }
     }
   };
 
   const redo = () => {
-    if (isEditingOutline) return;
     if (currentHistoryIndex < history.length - 1) {
       const nextIndex = currentHistoryIndex + 1;
       const nextOutline = history[nextIndex];
       setOutline(nextOutline);
-      setEditableOutlineText(generateOutlineText(nextOutline));
+      const nextText = generateOutlineText(nextOutline);
+      setEditableOutlineText(nextText);
+      setOriginalOutlineText(nextText);
       setCurrentHistoryIndex(nextIndex);
+      
+      // Exit edit mode if currently editing
+      if (isEditingOutline) {
+        setIsEditingOutline(false);
+      }
     }
   };
 
   const resetOutline = () => {
-    if (isEditingOutline) return;
     if (history.length > 0) {
       const initial = history[0];
       setOutline(initial);
-      setEditableOutlineText(generateOutlineText(initial));
+      const initialText = generateOutlineText(initial);
+      setEditableOutlineText(initialText);
+      setOriginalOutlineText(initialText);
       setCurrentHistoryIndex(0);
+      
+      // Exit edit mode if currently editing
+      if (isEditingOutline) {
+        setIsEditingOutline(false);
+      }
+      
       toast({
         title: 'Outline reset',
         description: 'Reverted to the original generated outline.',
@@ -127,7 +151,9 @@ const OutlineEditor = () => {
     const updatedOutline = { ...outline, title: newTitle };
     setOutline(updatedOutline);
     addToHistory(updatedOutline);
-    setEditableOutlineText(generateOutlineText(updatedOutline));
+    const updatedText = generateOutlineText(updatedOutline);
+    setEditableOutlineText(updatedText);
+    setOriginalOutlineText(updatedText);
   };
 
   // Generate editable text format (indent + prefix)
@@ -151,11 +177,6 @@ const OutlineEditor = () => {
     });
     return markdown;
   };
-
-  // Save edits: IMPORTANT - parse user edited text back to outline object to keep undo/redo working
-  // NOTE: Parsing user input properly is complex; here is a simple placeholder parser implementation:
-  // It only updates titles, does NOT recreate IDs, nor briefs.
-  // For production, replace with robust parser.
 
   const parseOutlineTextToOutline = (text: string, originalOutline: OutlineData): OutlineData => {
     const lines = text.split('\n').filter(Boolean);
@@ -195,10 +216,16 @@ const OutlineEditor = () => {
     setOutline(parsedOutline);
     addToHistory(parsedOutline);
     setIsEditingOutline(false);
+    setOriginalOutlineText(editableOutlineText);
     toast({
       title: 'Outline edited',
       description: 'Your edits have been saved and history updated.',
     });
+  };
+
+  const cancelEdit = () => {
+    setEditableOutlineText(originalOutlineText);
+    setIsEditingOutline(false);
   };
 
   const copyToClipboard = () => {
@@ -288,7 +315,7 @@ const OutlineEditor = () => {
             <Button
               variant="outline"
               onClick={undo}
-              disabled={currentHistoryIndex <= 0 || isEditingOutline}
+              disabled={currentHistoryIndex <= 0}
               className="p-2"
               title="Undo"
             >
@@ -297,7 +324,7 @@ const OutlineEditor = () => {
             <Button
               variant="outline"
               onClick={redo}
-              disabled={currentHistoryIndex >= history.length - 1 || isEditingOutline}
+              disabled={currentHistoryIndex >= history.length - 1}
               className="p-2"
               title="Redo"
             >
@@ -308,7 +335,6 @@ const OutlineEditor = () => {
               onClick={resetOutline}
               className="p-2"
               title="Reset Outline"
-              disabled={isEditingOutline}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -348,11 +374,11 @@ const OutlineEditor = () => {
       <div className="max-w-6xl mx-auto p-6">
         <Card className="p-8">
           <div className="mb-8">
-            <Input
+            <AutocompleteInput
               value={outline.title}
-              onChange={(e) => updateTitle(e.target.value)}
+              onChange={updateTitle}
+              placeholder="Enter outline title..."
               className="text-3xl font-bold border-none p-0 focus-visible:ring-0"
-              aria-label="Edit outline title"
               disabled={isEditingOutline}
             />
           </div>
@@ -361,22 +387,17 @@ const OutlineEditor = () => {
               <div>{outlineView}</div>
             ) : (
               <>
-                <Textarea
+                <AutocompleteInput
                   value={editableOutlineText}
-                  onChange={(e) => setEditableOutlineText(e.target.value)}
-                  rows={20}
+                  onChange={setEditableOutlineText}
+                  placeholder="Edit your outline content..."
                   className="font-mono text-base p-4 border border-border rounded"
-                  aria-label="Edit outline content"
+                  isTextarea={true}
+                  rows={20}
                 />
                 <div className="mt-4 flex space-x-4">
                   <Button onClick={saveEditedOutlineText}>Save</Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (outline) setEditableOutlineText(generateOutlineText(outline));
-                      setIsEditingOutline(false);
-                    }}
-                  >
+                  <Button variant="outline" onClick={cancelEdit}>
                     Cancel
                   </Button>
                 </div>
