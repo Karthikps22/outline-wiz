@@ -23,9 +23,9 @@ const Dashboard = () => {
   const { toast } = useToast();
 
   const outputTypes = [
-    { value: 'outline', label: 'Outline Only' },
-    { value: 'outline-brief', label: 'Outline + Content Brief' },
-    { value: 'outline-brief-intro', label: 'Outline + Brief + Intro Paragraph' }
+    { value: '1', label: 'Outline Only' },
+    { value: '2', label: 'Outline + Content Brief' },
+    { value: '3', label: 'Outline + Brief + Intro Paragraph' }
   ];
 
   const audiences = [
@@ -79,7 +79,7 @@ const Dashboard = () => {
     }
 
     setIsLoading(true);
-    
+
     try {
       const data = await apiService.generateOutline({
         topic: keyword,
@@ -87,20 +87,20 @@ const Dashboard = () => {
         audience: audience,
         tone: tone
       });
-      
+
       console.log('Full API Response:', JSON.stringify(data, null, 2));
-      
+
       // Check if we have the expected data structure
       if (!data.generated_content) {
         console.error('No generated_content in API response');
         throw new Error('Invalid API response format');
       }
-      
+
       // Parse the generated_content into structured outline format
       const parsedOutline = parseGeneratedContent(data.generated_content, data.topic || keyword);
-      
+
       console.log('Parsed outline:', JSON.stringify(parsedOutline, null, 2));
-      
+
       // Ensure we have sections before navigating
       if (!parsedOutline.sections || parsedOutline.sections.length === 0) {
         console.warn('No sections found in parsed outline');
@@ -114,33 +114,33 @@ const Dashboard = () => {
             brief: data.generated_content
           }]
         };
-        
-        navigate('/editor', { 
-          state: { 
-            keyword, 
-            outputType, 
-            audience, 
+
+        navigate('/editor', {
+          state: {
+            keyword,
+            outputType,
+            audience,
             tone,
             outline: fallbackOutline
-          } 
+          }
         });
       } else {
-        navigate('/editor', { 
-          state: { 
-            keyword, 
-            outputType, 
-            audience, 
+        navigate('/editor', {
+          state: {
+            keyword,
+            outputType,
+            audience,
             tone,
             outline: parsedOutline
-          } 
+          }
         });
       }
-      
+
       toast({
         title: 'Success',
         description: 'Outline generated successfully! Redirecting to editor...',
       });
-      
+
     } catch (error) {
       console.error('Error generating outline:', error);
       toast({
@@ -267,7 +267,7 @@ const Dashboard = () => {
 
             {/* Generate Button */}
             <div className="flex justify-center pt-4">
-              <Button 
+              <Button
                 onClick={handleGenerateOutline}
                 disabled={!keyword || !outputType || !audience || !tone || isLoading}
                 size="lg"

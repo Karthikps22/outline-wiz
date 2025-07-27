@@ -1,45 +1,79 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Copy, Download, Undo, Redo, RotateCcw, Eye, Edit, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Copy,
+  Download,
+  Undo,
+  Redo,
+  RotateCcw,
+  Eye,
+  Edit,
+  Loader2,
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { OutlineSection, OutlineData } from '@/types/outline';
+import { OutlineData } from '@/types/outline';
+import ReactMarkdown from 'react-markdown';
+
+// Helper component to render headings with correct tag based on level
+const Heading = ({ level, children }: { level: number; children: React.ReactNode }) => {
+  switch (level) {
+    case 1:
+      return <h1 style={{ marginLeft: 0, marginTop: 12 }}>{children}</h1>;
+    case 2:
+      return <h2 style={{ marginLeft: 20, marginTop: 10 }}>{children}</h2>;
+    case 3:
+      return <h3 style={{ marginLeft: 40, marginTop: 8 }}>{children}</h3>;
+    case 4:
+      return <h4 style={{ marginLeft: 60, marginTop: 6 }}>{children}</h4>;
+    case 5:
+      return <h5 style={{ marginLeft: 80, marginTop: 4 }}>{children}</h5>;
+    default:
+      return <div style={{ marginLeft: (level - 1) * 20, marginTop: 4 }}>{children}</div>;
+  }
+};
+
+// And your render tree node component:
+const TreeNodeSemantic = ({ section }: { section: any }) => {
+  return <Heading level={section.level}>{section.title}</Heading>;
+};
 
 const OutlineEditor = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+
   const [outline, setOutline] = useState<OutlineData | null>(null);
-  const [editingSection, setEditingSection] = useState<string | null>(null);
-  const [previewMode, setPreviewMode] = useState(false);
   const [history, setHistory] = useState<OutlineData[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
+  const [isEditingOutline, setIsEditingOutline] = useState(false);
+  const [editableOutlineText, setEditableOutlineText] = useState('');
+
+  // Visualization modes - Tree & Markdown only
+  const VISUALIZATION_MODES = ['Tree View', 'Markdown'];
+  const [viewMode, setViewMode] = useState(VISUALIZATION_MODES[0]);
+
   useEffect(() => {
-    console.log('OutlineEditor - location.state:', location.state);
-    
     if (location.state?.outline) {
       const initialOutline = location.state.outline;
-      console.log('Received outline:', initialOutline);
-      
       setOutline(initialOutline);
       setHistory([initialOutline]);
       setCurrentHistoryIndex(0);
-      
+      setEditableOutlineText(generateOutlineText(initialOutline));
       toast({
         title: 'Outline loaded',
         description: 'Your generated outline is ready for editing!',
       });
     } else {
-      console.warn('No outline data found in location state');
       toast({
         title: 'No outline data',
         description: 'Redirecting to dashboard...',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       navigate('/');
     }
@@ -53,83 +87,143 @@ const OutlineEditor = () => {
   };
 
   const undo = () => {
+    if (isEditingOutline) return;
     if (currentHistoryIndex > 0) {
-      setCurrentHistoryIndex(currentHistoryIndex - 1);
-      setOutline(history[currentHistoryIndex - 1]);
+      const prevIndex = currentHistoryIndex - 1;
+      const prevOutline = history[prevIndex];
+      setOutline(prevOutline);
+      setEditableOutlineText(generateOutlineText(prevOutline));
+      setCurrentHistoryIndex(prevIndex);
     }
   };
 
   const redo = () => {
+    if (isEditingOutline) return;
     if (currentHistoryIndex < history.length - 1) {
-      setCurrentHistoryIndex(currentHistoryIndex + 1);
-      setOutline(history[currentHistoryIndex + 1]);
+      const nextIndex = currentHistoryIndex + 1;
+      const nextOutline = history[nextIndex];
+      setOutline(nextOutline);
+      setEditableOutlineText(generateOutlineText(nextOutline));
+      setCurrentHistoryIndex(nextIndex);
     }
   };
 
   const resetOutline = () => {
+    if (isEditingOutline) return;
     if (history.length > 0) {
-      setOutline(history[0]);
+      const initial = history[0];
+      setOutline(initial);
+      setEditableOutlineText(generateOutlineText(initial));
       setCurrentHistoryIndex(0);
+      toast({
+        title: 'Outline reset',
+        description: 'Reverted to the original generated outline.',
+      });
     }
-  };
-
-  const updateSection = (sectionId: string, field: string, value: string) => {
-    if (!outline) return;
-
-    const updatedOutline = {
-      ...outline,
-      sections: outline.sections.map(section =>
-        section.id === sectionId ? { ...section, [field]: value } : section
-      )
-    };
-    
-    setOutline(updatedOutline);
-    addToHistory(updatedOutline);
   };
 
   const updateTitle = (newTitle: string) => {
     if (!outline) return;
-
     const updatedOutline = { ...outline, title: newTitle };
     setOutline(updatedOutline);
     addToHistory(updatedOutline);
+    setEditableOutlineText(generateOutlineText(updatedOutline));
+  };
+
+  // Generate editable text format (indent + prefix)
+  const generateOutlineText = (outline: OutlineData): string => {
+    if (!outline) return '';
+    let text = `- ${outline.title}\n`;
+    outline.sections.forEach((section) => {
+      const indent = '    '.repeat(section.level - 1);
+      const prefix = '|' + '-'.repeat(section.level + 1);
+      text += `${indent}${prefix} ${section.title}\n`;
+    });
+    return text;
+  };
+
+  const generateMarkdown = (outline: OutlineData): string => {
+    if (!outline) return '';
+    let markdown = `# ${outline.title}\n\n`;
+    outline.sections.forEach((section) => {
+      const prefix = '#'.repeat(section.level + 1);
+      markdown += `${prefix} ${section.title}\n`;
+    });
+    return markdown;
+  };
+
+  // Save edits: IMPORTANT - parse user edited text back to outline object to keep undo/redo working
+  // NOTE: Parsing user input properly is complex; here is a simple placeholder parser implementation:
+  // It only updates titles, does NOT recreate IDs, nor briefs.
+  // For production, replace with robust parser.
+
+  const parseOutlineTextToOutline = (text: string, originalOutline: OutlineData): OutlineData => {
+    const lines = text.split('\n').filter(Boolean);
+    if (lines.length === 0) return originalOutline;
+    const titleLine = lines[0];
+    let newTitle = titleLine.startsWith('- ') ? titleLine.substring(2).trim() : originalOutline.title;
+
+    // Parse sections
+    const sections: typeof originalOutline.sections = [];
+    lines.slice(1).forEach((line, idx) => {
+      // Detect indentation, prefix '|---', then title
+      const match = line.match(/^( *)(\|[-]+) (.+)$/);
+      if (match) {
+        const indentStr = match[1];
+        const prefixStr = match[2];
+        const title = match[3];
+        const level = prefixStr.length - 1; // because prefix has | + dashes count
+        sections.push({
+          id: `section-id-${idx}`, // new unique id placeholder
+          level,
+          title,
+          brief: '', // blank, parsing brief would be more complex
+        });
+      }
+    });
+
+    return {
+      title: newTitle,
+      sections,
+    };
+  };
+
+  const saveEditedOutlineText = () => {
+    if (!outline) return;
+    // Parse text back to outline object to update structured state and history
+    const parsedOutline = parseOutlineTextToOutline(editableOutlineText, outline);
+    setOutline(parsedOutline);
+    addToHistory(parsedOutline);
+    setIsEditingOutline(false);
+    toast({
+      title: 'Outline edited',
+      description: 'Your edits have been saved and history updated.',
+    });
   };
 
   const copyToClipboard = () => {
     if (!outline) return;
 
-    let markdown = `# ${outline.title}\n\n`;
-    outline.sections.forEach(section => {
-      const prefix = '#'.repeat(section.level + 1);
-      markdown += `${prefix} ${section.title}\n`;
-      if (section.brief) {
-        markdown += `\n${section.brief}\n\n`;
-      } else {
-        markdown += '\n';
-      }
-    });
+    let textToCopy = '';
+    if (viewMode === 'Markdown') {
+      textToCopy = generateMarkdown(outline);
+    } else if (viewMode === 'Tree View') {
+      textToCopy = editableOutlineText;
+    } else {
+      textToCopy = editableOutlineText;
+    }
 
-    navigator.clipboard.writeText(markdown);
+    navigator.clipboard.writeText(textToCopy);
     toast({
       title: 'Copied to clipboard',
-      description: 'Outline has been copied as Markdown',
+      description: 'Outline has been copied.',
     });
   };
 
   const downloadMarkdown = () => {
     if (!outline) return;
 
-    let markdown = `# ${outline.title}\n\n`;
-    outline.sections.forEach(section => {
-      const prefix = '#'.repeat(section.level + 1);
-      markdown += `${prefix} ${section.title}\n`;
-      if (section.brief) {
-        markdown += `\n${section.brief}\n\n`;
-      } else {
-        markdown += '\n';
-      }
-    });
-
+    const markdown = generateMarkdown(outline);
     const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -155,60 +249,97 @@ const OutlineEditor = () => {
     );
   }
 
-  console.log('Rendering outline with', outline.sections.length, 'sections');
+  // Render tree view with proper heading tags
+  const renderTreeView = (sections: OutlineData['sections']) => {
+    return sections.map(section => <TreeNodeSemantic key={section.id} section={section} />);
+  };
+
+  let outlineView = null;
+  switch (viewMode) {
+    case 'Tree View':
+      outlineView = renderTreeView(outline.sections);
+      break;
+    case 'Markdown':
+      outlineView = (
+        <div
+          className="prose max-w-none bg-white p-4 rounded shadow border border-gray-200"
+          aria-label="Markdown formatted outline"
+        >
+          <ReactMarkdown>{generateMarkdown(outline)}</ReactMarkdown>
+        </div>
+      );
+      break;
+    default:
+      outlineView = <div />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border bg-card">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate('/')} className="p-2">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-semibold text-foreground">Outline Editor</h1>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                onClick={undo}
-                disabled={currentHistoryIndex <= 0}
-                className="p-2"
-              >
-                <Undo className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={redo}
-                disabled={currentHistoryIndex >= history.length - 1}
-                className="p-2"
-              >
-                <Redo className="h-4 w-4" />
-              </Button>
-              
-              <Button variant="outline" onClick={resetOutline} className="p-2">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={() => setPreviewMode(!previewMode)}
-                className="p-2"
-              >
-                {previewMode ? <Edit className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-              
-              <Button variant="outline" onClick={copyToClipboard} className="p-2">
-                <Copy className="h-4 w-4" />
-              </Button>
-              
-              <Button onClick={downloadMarkdown} className="p-2">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => navigate('/')} className="p-2">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl font-semibold text-foreground">Outline Editor</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={undo}
+              disabled={currentHistoryIndex <= 0 || isEditingOutline}
+              className="p-2"
+              title="Undo"
+            >
+              <Undo className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={redo}
+              disabled={currentHistoryIndex >= history.length - 1 || isEditingOutline}
+              className="p-2"
+              title="Redo"
+            >
+              <Redo className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={resetOutline}
+              className="p-2"
+              title="Reset Outline"
+              disabled={isEditingOutline}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditingOutline(!isEditingOutline)}
+              className="p-2"
+              title={isEditingOutline ? 'Preview Outline' : 'Edit Outline'}
+            >
+              {isEditingOutline ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+            </Button>
+            <Button variant="outline" onClick={copyToClipboard} className="p-2" title="Copy Outline">
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button onClick={downloadMarkdown} className="p-2" title="Download Markdown">
+              <Download className="h-4 w-4" />
+            </Button>
+
+            <select
+              className="border rounded px-2 py-1 ml-3"
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              aria-label="Change visualization mode"
+              disabled={isEditingOutline}
+            >
+              {VISUALIZATION_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -216,71 +347,40 @@ const OutlineEditor = () => {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto p-6">
         <Card className="p-8">
-          {/* Title */}
           <div className="mb-8">
-            {previewMode ? (
-              <h1 className="text-3xl font-bold text-foreground">{outline.title}</h1>
-            ) : (
-              <Input
-                value={outline.title}
-                onChange={(e) => updateTitle(e.target.value)}
-                className="text-3xl font-bold border-none p-0 focus-visible:ring-0"
-                placeholder="Enter outline title..."
-              />
-            )}
+            <Input
+              value={outline.title}
+              onChange={(e) => updateTitle(e.target.value)}
+              className="text-3xl font-bold border-none p-0 focus-visible:ring-0"
+              aria-label="Edit outline title"
+              disabled={isEditingOutline}
+            />
           </div>
-
-          {/* Sections */}
-          <div className="space-y-4">
-            {outline.sections.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No sections found. The outline might need manual editing.</p>
-              </div>
+          <div>
+            {!isEditingOutline ? (
+              <div>{outlineView}</div>
             ) : (
-              outline.sections.map((section) => (
-                <div key={section.id} className="border-l-2 border-border pl-4">
-                  <div className={`flex items-start space-x-3 ${section.level > 1 ? 'ml-6' : ''}`}>
-                    <div className="flex-1">
-                      {previewMode ? (
-                        <div>
-                          <div 
-                            className={`font-semibold text-foreground ${
-                              section.level === 1 ? 'text-2xl' :
-                              section.level === 2 ? 'text-xl' :
-                              section.level === 3 ? 'text-lg' : 'text-base'
-                            }`}
-                          >
-                            {section.title}
-                          </div>
-                          {section.brief && (
-                            <p className="text-muted-foreground mt-2">{section.brief}</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <Input
-                            value={section.title}
-                            onChange={(e) => updateSection(section.id, 'title', e.target.value)}
-                            className={`font-semibold ${
-                              section.level === 1 ? 'text-2xl' :
-                              section.level === 2 ? 'text-xl' :
-                              section.level === 3 ? 'text-lg' : 'text-base'
-                            }`}
-                            placeholder="Section title..."
-                          />
-                          <Textarea
-                            value={section.brief || ''}
-                            onChange={(e) => updateSection(section.id, 'brief', e.target.value)}
-                            placeholder="Brief description (optional)..."
-                            rows={2}
-                            className="text-muted-foreground"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              <>
+                <Textarea
+                  value={editableOutlineText}
+                  onChange={(e) => setEditableOutlineText(e.target.value)}
+                  rows={20}
+                  className="font-mono text-base p-4 border border-border rounded"
+                  aria-label="Edit outline content"
+                />
+                <div className="mt-4 flex space-x-4">
+                  <Button onClick={saveEditedOutlineText}>Save</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (outline) setEditableOutlineText(generateOutlineText(outline));
+                      setIsEditingOutline(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
-              ))
+              </>
             )}
           </div>
         </Card>
