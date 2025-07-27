@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/services/api';
 import { parseGeneratedContent } from '@/utils/outlineParser';
+import TrendingTopics from '@/components/TrendingTopics';
 
 const Dashboard = () => {
   const [keyword, setKeyword] = useState('');
@@ -66,6 +66,11 @@ const Dashboard = () => {
     } else {
       setShowSuggestions(false);
     }
+  };
+
+  const handleTrendingTopicSelect = (topic: string) => {
+    setKeyword(topic);
+    setShowSuggestions(false);
   };
 
   const handleGenerateOutline = async () => {
@@ -204,6 +209,9 @@ const Dashboard = () => {
                   </div>
                 )}
               </div>
+              
+              {/* Trending Topics */}
+              <TrendingTopics onTopicSelect={handleTrendingTopicSelect} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
