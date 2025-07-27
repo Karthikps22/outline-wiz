@@ -36,24 +36,26 @@ const TrendingTopics: React.FC<TrendingTopicsProps> = ({ onTopicSelect }) => {
   ];
 
   return (
-    <div className="mt-4">
-      <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium text-muted-foreground">Trending Topics</h3>
+    <div className="mt-6">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="p-1 rounded-md bg-primary/10">
+          <TrendingUp className="h-4 w-4 text-primary" />
+        </div>
+        <h3 className="text-sm font-medium text-foreground">Trending Topics</h3>
       </div>
       <div className="flex flex-wrap gap-2">
         {trendingTopics.map((topic) => (
           <button
             key={topic.id}
             onClick={() => onTopicSelect(topic.title)}
-            className="flex items-center gap-2 px-3 py-2 bg-secondary hover:bg-accent rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-card/50 hover:bg-accent border border-border/50 rounded-lg transition-all duration-200 text-sm backdrop-blur-sm hover:shadow-md"
           >
             <img 
               src={topic.logo} 
               alt={topic.title}
               className="w-5 h-5 rounded-full object-cover"
             />
-            <span className="text-secondary-foreground">{topic.title}</span>
+            <span className="text-foreground">{topic.title}</span>
           </button>
         ))}
       </div>
