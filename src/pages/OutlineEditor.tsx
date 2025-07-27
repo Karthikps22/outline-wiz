@@ -130,6 +130,7 @@ const OutlineEditor = () => {
     setEditableOutlineText(generateOutlineText(updatedOutline));
   };
 
+  // Generate editable text format (indent + prefix)
   const generateOutlineText = (outline: OutlineData): string => {
     if (!outline) return '';
     let text = `- ${outline.title}\n`;
@@ -150,6 +151,11 @@ const OutlineEditor = () => {
     });
     return markdown;
   };
+
+  // Save edits: IMPORTANT - parse user edited text back to outline object to keep undo/redo working
+  // NOTE: Parsing user input properly is complex; here is a simple placeholder parser implementation:
+  // It only updates titles, does NOT recreate IDs, nor briefs.
+  // For production, replace with robust parser.
 
   const parseOutlineTextToOutline = (text: string, originalOutline: OutlineData): OutlineData => {
     const lines = text.split('\n').filter(Boolean);
@@ -234,7 +240,7 @@ const OutlineEditor = () => {
 
   if (!outline) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading outline...</p>
@@ -256,7 +262,7 @@ const OutlineEditor = () => {
     case 'Markdown':
       outlineView = (
         <div
-          className="prose max-w-none bg-card p-6 rounded-lg shadow-sm border border-border"
+          className="prose max-w-none bg-white p-4 rounded shadow border border-gray-200"
           aria-label="Markdown formatted outline"
         >
           <ReactMarkdown>{generateMarkdown(outline)}</ReactMarkdown>
@@ -268,9 +274,9 @@ const OutlineEditor = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-border bg-card/80 backdrop-blur-sm">
+      <div className="border-b border-border bg-card">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Button variant="ghost" onClick={() => navigate('/')} className="p-2">
@@ -322,7 +328,7 @@ const OutlineEditor = () => {
             </Button>
 
             <select
-              className="border border-border rounded-md px-3 py-2 ml-3 bg-card text-foreground"
+              className="border rounded px-2 py-1 ml-3"
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value)}
               aria-label="Change visualization mode"
@@ -340,26 +346,26 @@ const OutlineEditor = () => {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto p-6">
-        <Card className="p-8 shadow-lg border-0 bg-card/50 backdrop-blur-sm">
+        <Card className="p-8">
           <div className="mb-8">
             <Input
               value={outline.title}
               onChange={(e) => updateTitle(e.target.value)}
-              className="text-3xl font-bold border-none p-0 focus-visible:ring-0 bg-transparent"
+              className="text-3xl font-bold border-none p-0 focus-visible:ring-0"
               aria-label="Edit outline title"
               disabled={isEditingOutline}
             />
           </div>
           <div>
             {!isEditingOutline ? (
-              <div className="bg-card/30 rounded-lg p-6 border border-border/50">{outlineView}</div>
+              <div>{outlineView}</div>
             ) : (
               <>
                 <Textarea
                   value={editableOutlineText}
                   onChange={(e) => setEditableOutlineText(e.target.value)}
                   rows={20}
-                  className="font-mono text-base p-4 border border-border rounded-lg bg-card/50"
+                  className="font-mono text-base p-4 border border-border rounded"
                   aria-label="Edit outline content"
                 />
                 <div className="mt-4 flex space-x-4">

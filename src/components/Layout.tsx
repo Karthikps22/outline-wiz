@@ -10,16 +10,14 @@ const Layout = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-border bg-card/80 backdrop-blur-sm">
+      <nav className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <Link to="/" className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
+                <FileText className="h-6 w-6 text-primary" />
                 <span className="text-lg font-semibold text-foreground">SEO Outline Generator</span>
               </Link>
             </div>
