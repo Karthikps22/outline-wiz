@@ -16,8 +16,22 @@ export const parseMarkdownContent = (content: string): OutlineData => {
       return;
     }
     
-    // Parse headings
-    if (trimmed.startsWith('### ')) {
+    // Parse headings with H1:, H2:, H3:, H4:, H5: prefixes
+    if (trimmed.startsWith('##### ')) {
+      const sectionTitle = trimmed.replace('##### ', '').replace(/^H5:\s*/, '');
+      sections.push({
+        id: `section-${index}`,
+        level: 5,
+        title: sectionTitle
+      });
+    } else if (trimmed.startsWith('#### ')) {
+      const sectionTitle = trimmed.replace('#### ', '').replace(/^H4:\s*/, '');
+      sections.push({
+        id: `section-${index}`,
+        level: 4,
+        title: sectionTitle
+      });
+    } else if (trimmed.startsWith('### ')) {
       const sectionTitle = trimmed.replace('### ', '').replace(/^H3:\s*/, '');
       sections.push({
         id: `section-${index}`,
@@ -50,7 +64,9 @@ export const parseMarkdownContent = (content: string): OutlineData => {
 export const generateMarkdownFromContent = (content: string): string => {
   // Clean up the content and ensure proper markdown formatting
   return content
-    .replace(/^# H1:\s*/gm, '# ')
+    .replace(/^##### H5:\s*/gm, '##### ')
+    .replace(/^#### H4:\s*/gm, '#### ')
+    .replace(/^### H3:\s*/gm, '### ')
     .replace(/^## H2:\s*/gm, '## ')
-    .replace(/^### H3:\s*/gm, '### ');
+    .replace(/^# H1:\s*/gm, '# ');
 };

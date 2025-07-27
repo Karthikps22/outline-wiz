@@ -27,6 +27,16 @@ const BlogPostRenderer: React.FC<BlogPostRendererProps> = ({ content, className 
               {children}
             </h3>
           ),
+          h4: ({ children }) => (
+            <h4 className="text-xl font-medium mb-2 text-foreground mt-5">
+              {children}
+            </h4>
+          ),
+          h5: ({ children }) => (
+            <h5 className="text-lg font-medium mb-2 text-foreground mt-4">
+              {children}
+            </h5>
+          ),
           p: ({ children }) => (
             <p className="text-base leading-relaxed mb-4 text-muted-foreground">
               {children}

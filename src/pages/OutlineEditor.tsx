@@ -40,7 +40,6 @@ const Heading = ({ level, children }: { level: number; children: React.ReactNode
   }
 };
 
-// And your render tree node component:
 const TreeNodeSemantic = ({ section }: { section: any }) => {
   return <Heading level={section.level}>{section.title}</Heading>;
 };
@@ -163,7 +162,7 @@ const OutlineEditor = () => {
     
     // Update raw content title if it exists
     if (rawContent) {
-      const updatedRawContent = rawContent.replace(/^# .*$/m, `# ${newTitle}`);
+      const updatedRawContent = rawContent.replace(/^# .*$/m, `# H1: ${newTitle}`);
       setRawContent(updatedRawContent);
       setEditableOutlineText(updatedRawContent);
       setOriginalOutlineText(updatedRawContent);
@@ -174,14 +173,13 @@ const OutlineEditor = () => {
     }
   };
 
-  // Generate editable text format (indent + prefix)
+  // Generate editable text format with H1:, H2:, etc. prefixes
   const generateOutlineText = (outline: OutlineData): string => {
     if (!outline) return '';
-    let text = `- ${outline.title}\n`;
+    let text = `# H1: ${outline.title}\n\n`;
     outline.sections.forEach((section) => {
-      const indent = '    '.repeat(section.level - 1);
-      const prefix = '|' + '-'.repeat(section.level + 1);
-      text += `${indent}${prefix} ${section.title}\n`;
+      const prefix = '#'.repeat(section.level);
+      text += `${prefix} H${section.level}: ${section.title}\n`;
     });
     return text;
   };
@@ -197,7 +195,7 @@ const OutlineEditor = () => {
     // Otherwise, generate from outline structure
     let markdown = `# ${outline.title}\n\n`;
     outline.sections.forEach((section) => {
-      const prefix = '#'.repeat(section.level + 1);
+      const prefix = '#'.repeat(section.level);
       markdown += `${prefix} ${section.title}\n`;
     });
     return markdown;
@@ -206,24 +204,52 @@ const OutlineEditor = () => {
   const parseOutlineTextToOutline = (text: string, originalOutline: OutlineData): OutlineData => {
     const lines = text.split('\n').filter(Boolean);
     if (lines.length === 0) return originalOutline;
+    
     const titleLine = lines[0];
-    let newTitle = titleLine.startsWith('- ') ? titleLine.substring(2).trim() : originalOutline.title;
+    let newTitle = titleLine.replace(/^# H1:\s*/, '').trim() || originalOutline.title;
 
     // Parse sections
     const sections: typeof originalOutline.sections = [];
     lines.slice(1).forEach((line, idx) => {
-      // Detect indentation, prefix '|---', then title
-      const match = line.match(/^( *)(\|[-]+) (.+)$/);
-      if (match) {
-        const indentStr = match[1];
-        const prefixStr = match[2];
-        const title = match[3];
-        const level = prefixStr.length - 1; // because prefix has | + dashes count
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      
+      // Match H1: through H5: patterns
+      const h5Match = trimmed.match(/^##### H5:\s*(.+)$/);
+      const h4Match = trimmed.match(/^#### H4:\s*(.+)$/);
+      const h3Match = trimmed.match(/^### H3:\s*(.+)$/);
+      const h2Match = trimmed.match(/^## H2:\s*(.+)$/);
+      const h1Match = trimmed.match(/^# H1:\s*(.+)$/);
+      
+      if (h5Match) {
         sections.push({
-          id: `section-id-${idx}`, // new unique id placeholder
-          level,
-          title,
-          brief: '', // blank, parsing brief would be more complex
+          id: `section-${idx}`,
+          level: 5,
+          title: h5Match[1]
+        });
+      } else if (h4Match) {
+        sections.push({
+          id: `section-${idx}`,
+          level: 4,
+          title: h4Match[1]
+        });
+      } else if (h3Match) {
+        sections.push({
+          id: `section-${idx}`,
+          level: 3,
+          title: h3Match[1]
+        });
+      } else if (h2Match) {
+        sections.push({
+          id: `section-${idx}`,
+          level: 2,
+          title: h2Match[1]
+        });
+      } else if (h1Match) {
+        sections.push({
+          id: `section-${idx}`,
+          level: 1,
+          title: h1Match[1]
         });
       }
     });
