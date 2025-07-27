@@ -18,9 +18,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { OutlineData } from '@/types/outline';
 import ReactMarkdown from 'react-markdown';
-import AutocompleteInput from '@/components/AutocompleteInput';
-import BlogPostRenderer from '@/components/BlogPostRenderer';
-import { parseMarkdownContent, generateMarkdownFromContent } from '@/utils/markdownParser';
 
 // Helper component to render headings with correct tag based on level
 const Heading = ({ level, children }: { level: number; children: React.ReactNode }) => {
@@ -40,6 +37,7 @@ const Heading = ({ level, children }: { level: number; children: React.ReactNode
   }
 };
 
+// And your render tree node component:
 const TreeNodeSemantic = ({ section }: { section: any }) => {
   return <Heading level={section.level}>{section.title}</Heading>;
 };
@@ -52,14 +50,12 @@ const OutlineEditor = () => {
   const [outline, setOutline] = useState<OutlineData | null>(null);
   const [history, setHistory] = useState<OutlineData[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
-  const [rawContent, setRawContent] = useState('');
 
   const [isEditingOutline, setIsEditingOutline] = useState(false);
   const [editableOutlineText, setEditableOutlineText] = useState('');
-  const [originalOutlineText, setOriginalOutlineText] = useState('');
 
   // Visualization modes - Tree & Markdown only
-  const VISUALIZATION_MODES = ['Blog View', 'Tree View', 'Markdown'];
+  const VISUALIZATION_MODES = ['Tree View', 'Markdown'];
   const [viewMode, setViewMode] = useState(VISUALIZATION_MODES[0]);
 
   useEffect(() => {
@@ -68,16 +64,7 @@ const OutlineEditor = () => {
       setOutline(initialOutline);
       setHistory([initialOutline]);
       setCurrentHistoryIndex(0);
-      
-      // Check if we have raw content from API
-      const rawApiContent = location.state.rawContent || '';
-      setRawContent(rawApiContent);
-      
-      // Use raw content if available, otherwise generate from outline
-      const initialText = rawApiContent || generateOutlineText(initialOutline);
-      setEditableOutlineText(initialText);
-      setOriginalOutlineText(initialText);
-      
+      setEditableOutlineText(generateOutlineText(initialOutline));
       toast({
         title: 'Outline loaded',
         description: 'Your generated outline is ready for editing!',
@@ -100,53 +87,34 @@ const OutlineEditor = () => {
   };
 
   const undo = () => {
+    if (isEditingOutline) return;
     if (currentHistoryIndex > 0) {
       const prevIndex = currentHistoryIndex - 1;
       const prevOutline = history[prevIndex];
       setOutline(prevOutline);
-      const prevText = generateOutlineText(prevOutline);
-      setEditableOutlineText(prevText);
-      setOriginalOutlineText(prevText);
+      setEditableOutlineText(generateOutlineText(prevOutline));
       setCurrentHistoryIndex(prevIndex);
-      
-      // Exit edit mode if currently editing
-      if (isEditingOutline) {
-        setIsEditingOutline(false);
-      }
     }
   };
 
   const redo = () => {
+    if (isEditingOutline) return;
     if (currentHistoryIndex < history.length - 1) {
       const nextIndex = currentHistoryIndex + 1;
       const nextOutline = history[nextIndex];
       setOutline(nextOutline);
-      const nextText = generateOutlineText(nextOutline);
-      setEditableOutlineText(nextText);
-      setOriginalOutlineText(nextText);
+      setEditableOutlineText(generateOutlineText(nextOutline));
       setCurrentHistoryIndex(nextIndex);
-      
-      // Exit edit mode if currently editing
-      if (isEditingOutline) {
-        setIsEditingOutline(false);
-      }
     }
   };
 
   const resetOutline = () => {
+    if (isEditingOutline) return;
     if (history.length > 0) {
       const initial = history[0];
       setOutline(initial);
-      const initialText = generateOutlineText(initial);
-      setEditableOutlineText(initialText);
-      setOriginalOutlineText(initialText);
+      setEditableOutlineText(generateOutlineText(initial));
       setCurrentHistoryIndex(0);
-      
-      // Exit edit mode if currently editing
-      if (isEditingOutline) {
-        setIsEditingOutline(false);
-      }
-      
       toast({
         title: 'Outline reset',
         description: 'Reverted to the original generated outline.',
@@ -159,97 +127,57 @@ const OutlineEditor = () => {
     const updatedOutline = { ...outline, title: newTitle };
     setOutline(updatedOutline);
     addToHistory(updatedOutline);
-    
-    // Update raw content title if it exists
-    if (rawContent) {
-      const updatedRawContent = rawContent.replace(/^# .*$/m, `# H1: ${newTitle}`);
-      setRawContent(updatedRawContent);
-      setEditableOutlineText(updatedRawContent);
-      setOriginalOutlineText(updatedRawContent);
-    } else {
-      const updatedText = generateOutlineText(updatedOutline);
-      setEditableOutlineText(updatedText);
-      setOriginalOutlineText(updatedText);
-    }
+    setEditableOutlineText(generateOutlineText(updatedOutline));
   };
 
-  // Generate editable text format with H1:, H2:, etc. prefixes
+  // Generate editable text format (indent + prefix)
   const generateOutlineText = (outline: OutlineData): string => {
     if (!outline) return '';
-    let text = `# H1: ${outline.title}\n\n`;
+    let text = `- ${outline.title}\n`;
     outline.sections.forEach((section) => {
-      const prefix = '#'.repeat(section.level);
-      text += `${prefix} H${section.level}: ${section.title}\n`;
+      const indent = '    '.repeat(section.level - 1);
+      const prefix = '|' + '-'.repeat(section.level + 1);
+      text += `${indent}${prefix} ${section.title}\n`;
     });
     return text;
   };
 
   const generateMarkdown = (outline: OutlineData): string => {
     if (!outline) return '';
-    
-    // If we have raw content, use it for markdown generation
-    if (rawContent) {
-      return generateMarkdownFromContent(rawContent);
-    }
-    
-    // Otherwise, generate from outline structure
     let markdown = `# ${outline.title}\n\n`;
     outline.sections.forEach((section) => {
-      const prefix = '#'.repeat(section.level);
+      const prefix = '#'.repeat(section.level + 1);
       markdown += `${prefix} ${section.title}\n`;
     });
     return markdown;
   };
 
+  // Save edits: IMPORTANT - parse user edited text back to outline object to keep undo/redo working
+  // NOTE: Parsing user input properly is complex; here is a simple placeholder parser implementation:
+  // It only updates titles, does NOT recreate IDs, nor briefs.
+  // For production, replace with robust parser.
+
   const parseOutlineTextToOutline = (text: string, originalOutline: OutlineData): OutlineData => {
     const lines = text.split('\n').filter(Boolean);
     if (lines.length === 0) return originalOutline;
-    
     const titleLine = lines[0];
-    let newTitle = titleLine.replace(/^# H1:\s*/, '').trim() || originalOutline.title;
+    let newTitle = titleLine.startsWith('- ') ? titleLine.substring(2).trim() : originalOutline.title;
 
     // Parse sections
     const sections: typeof originalOutline.sections = [];
     lines.slice(1).forEach((line, idx) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      
-      // Match H1: through H5: patterns
-      const h5Match = trimmed.match(/^##### H5:\s*(.+)$/);
-      const h4Match = trimmed.match(/^#### H4:\s*(.+)$/);
-      const h3Match = trimmed.match(/^### H3:\s*(.+)$/);
-      const h2Match = trimmed.match(/^## H2:\s*(.+)$/);
-      const h1Match = trimmed.match(/^# H1:\s*(.+)$/);
-      
-      if (h5Match) {
+      // Detect indentation, prefix '|---', then title
+      const match = line.match(/^( *)(\|[-]+) (.+)$/);
+      if (match) {
+        const indentStr = match[1];
+        const prefixStr = match[2];
+        const title = match[3];
+        const level = prefixStr.length - 1; // because prefix has | + dashes count
         sections.push({
-          id: `section-${idx}`,
-          level: 5,
-          title: h5Match[1]
-        });
-      } else if (h4Match) {
-        sections.push({
-          id: `section-${idx}`,
-          level: 4,
-          title: h4Match[1]
-        });
-      } else if (h3Match) {
-        sections.push({
-          id: `section-${idx}`,
-          level: 3,
-          title: h3Match[1]
-        });
-      } else if (h2Match) {
-        sections.push({
-          id: `section-${idx}`,
-          level: 2,
-          title: h2Match[1]
-        });
-      } else if (h1Match) {
-        sections.push({
-          id: `section-${idx}`,
-          level: 1,
-          title: h1Match[1]
+          id: `section-id-${idx}`, // new unique id placeholder
+          level,
+          title,
+          brief: '', // blank, parsing brief would be more complex
         });
       }
     });
@@ -262,32 +190,15 @@ const OutlineEditor = () => {
 
   const saveEditedOutlineText = () => {
     if (!outline) return;
-    
-    // Update raw content if we're working with markdown content
-    if (rawContent) {
-      setRawContent(editableOutlineText);
-      // Parse the content to update the outline structure
-      const parsedOutline = parseMarkdownContent(editableOutlineText);
-      setOutline(parsedOutline);
-      addToHistory(parsedOutline);
-    } else {
-      // Parse text back to outline object for structured content
-      const parsedOutline = parseOutlineTextToOutline(editableOutlineText, outline);
-      setOutline(parsedOutline);
-      addToHistory(parsedOutline);
-    }
-    
+    // Parse text back to outline object to update structured state and history
+    const parsedOutline = parseOutlineTextToOutline(editableOutlineText, outline);
+    setOutline(parsedOutline);
+    addToHistory(parsedOutline);
     setIsEditingOutline(false);
-    setOriginalOutlineText(editableOutlineText);
     toast({
       title: 'Outline edited',
       description: 'Your edits have been saved and history updated.',
     });
-  };
-
-  const cancelEdit = () => {
-    setEditableOutlineText(originalOutlineText);
-    setIsEditingOutline(false);
   };
 
   const copyToClipboard = () => {
@@ -296,8 +207,8 @@ const OutlineEditor = () => {
     let textToCopy = '';
     if (viewMode === 'Markdown') {
       textToCopy = generateMarkdown(outline);
-    } else if (viewMode === 'Blog View' && rawContent) {
-      textToCopy = generateMarkdownFromContent(rawContent);
+    } else if (viewMode === 'Tree View') {
+      textToCopy = editableOutlineText;
     } else {
       textToCopy = editableOutlineText;
     }
@@ -345,22 +256,6 @@ const OutlineEditor = () => {
 
   let outlineView = null;
   switch (viewMode) {
-    case 'Blog View':
-      if (rawContent) {
-        const cleanedContent = generateMarkdownFromContent(rawContent);
-        outlineView = (
-          <div className="bg-white p-8 rounded-lg shadow-sm border border-border">
-            <BlogPostRenderer content={cleanedContent} />
-          </div>
-        );
-      } else {
-        outlineView = (
-          <div className="bg-white p-8 rounded-lg shadow-sm border border-border">
-            <BlogPostRenderer content={generateMarkdown(outline)} />
-          </div>
-        );
-      }
-      break;
     case 'Tree View':
       outlineView = renderTreeView(outline.sections);
       break;
@@ -393,7 +288,7 @@ const OutlineEditor = () => {
             <Button
               variant="outline"
               onClick={undo}
-              disabled={currentHistoryIndex <= 0}
+              disabled={currentHistoryIndex <= 0 || isEditingOutline}
               className="p-2"
               title="Undo"
             >
@@ -402,7 +297,7 @@ const OutlineEditor = () => {
             <Button
               variant="outline"
               onClick={redo}
-              disabled={currentHistoryIndex >= history.length - 1}
+              disabled={currentHistoryIndex >= history.length - 1 || isEditingOutline}
               className="p-2"
               title="Redo"
             >
@@ -413,6 +308,7 @@ const OutlineEditor = () => {
               onClick={resetOutline}
               className="p-2"
               title="Reset Outline"
+              disabled={isEditingOutline}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -452,11 +348,11 @@ const OutlineEditor = () => {
       <div className="max-w-6xl mx-auto p-6">
         <Card className="p-8">
           <div className="mb-8">
-            <AutocompleteInput
+            <Input
               value={outline.title}
-              onChange={updateTitle}
-              placeholder="Enter outline title..."
+              onChange={(e) => updateTitle(e.target.value)}
               className="text-3xl font-bold border-none p-0 focus-visible:ring-0"
+              aria-label="Edit outline title"
               disabled={isEditingOutline}
             />
           </div>
@@ -465,17 +361,22 @@ const OutlineEditor = () => {
               <div>{outlineView}</div>
             ) : (
               <>
-                <AutocompleteInput
+                <Textarea
                   value={editableOutlineText}
-                  onChange={setEditableOutlineText}
-                  placeholder="Edit your outline content..."
+                  onChange={(e) => setEditableOutlineText(e.target.value)}
+                  rows={20}
                   className="font-mono text-base p-4 border border-border rounded"
-                  isTextarea={true}
-                  rows={25}
+                  aria-label="Edit outline content"
                 />
                 <div className="mt-4 flex space-x-4">
                   <Button onClick={saveEditedOutlineText}>Save</Button>
-                  <Button variant="outline" onClick={cancelEdit}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (outline) setEditableOutlineText(generateOutlineText(outline));
+                      setIsEditingOutline(false);
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
