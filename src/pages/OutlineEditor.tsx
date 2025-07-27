@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 import { OutlineData } from '@/types/outline';
 import ReactMarkdown from 'react-markdown';
 import AutocompleteInput from '@/components/AutocompleteInput';
+import BlogPostRenderer from '@/components/BlogPostRenderer';
+import { parseMarkdownContent, generateMarkdownFromContent } from '@/utils/markdownParser';
 
 // Helper component to render headings with correct tag based on level
 const Heading = ({ level, children }: { level: number; children: React.ReactNode }) => {
@@ -52,13 +53,14 @@ const OutlineEditor = () => {
   const [outline, setOutline] = useState<OutlineData | null>(null);
   const [history, setHistory] = useState<OutlineData[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
+  const [rawContent, setRawContent] = useState('');
 
   const [isEditingOutline, setIsEditingOutline] = useState(false);
   const [editableOutlineText, setEditableOutlineText] = useState('');
   const [originalOutlineText, setOriginalOutlineText] = useState('');
 
   // Visualization modes - Tree & Markdown only
-  const VISUALIZATION_MODES = ['Tree View', 'Markdown'];
+  const VISUALIZATION_MODES = ['Blog View', 'Tree View', 'Markdown'];
   const [viewMode, setViewMode] = useState(VISUALIZATION_MODES[0]);
 
   useEffect(() => {
@@ -67,9 +69,16 @@ const OutlineEditor = () => {
       setOutline(initialOutline);
       setHistory([initialOutline]);
       setCurrentHistoryIndex(0);
-      const initialText = generateOutlineText(initialOutline);
+      
+      // Check if we have raw content from API
+      const rawApiContent = location.state.rawContent || '';
+      setRawContent(rawApiContent);
+      
+      // Use raw content if available, otherwise generate from outline
+      const initialText = rawApiContent || generateOutlineText(initialOutline);
       setEditableOutlineText(initialText);
       setOriginalOutlineText(initialText);
+      
       toast({
         title: 'Outline loaded',
         description: 'Your generated outline is ready for editing!',
@@ -151,9 +160,18 @@ const OutlineEditor = () => {
     const updatedOutline = { ...outline, title: newTitle };
     setOutline(updatedOutline);
     addToHistory(updatedOutline);
-    const updatedText = generateOutlineText(updatedOutline);
-    setEditableOutlineText(updatedText);
-    setOriginalOutlineText(updatedText);
+    
+    // Update raw content title if it exists
+    if (rawContent) {
+      const updatedRawContent = rawContent.replace(/^# .*$/m, `# ${newTitle}`);
+      setRawContent(updatedRawContent);
+      setEditableOutlineText(updatedRawContent);
+      setOriginalOutlineText(updatedRawContent);
+    } else {
+      const updatedText = generateOutlineText(updatedOutline);
+      setEditableOutlineText(updatedText);
+      setOriginalOutlineText(updatedText);
+    }
   };
 
   // Generate editable text format (indent + prefix)
@@ -170,6 +188,13 @@ const OutlineEditor = () => {
 
   const generateMarkdown = (outline: OutlineData): string => {
     if (!outline) return '';
+    
+    // If we have raw content, use it for markdown generation
+    if (rawContent) {
+      return generateMarkdownFromContent(rawContent);
+    }
+    
+    // Otherwise, generate from outline structure
     let markdown = `# ${outline.title}\n\n`;
     outline.sections.forEach((section) => {
       const prefix = '#'.repeat(section.level + 1);
@@ -211,10 +236,21 @@ const OutlineEditor = () => {
 
   const saveEditedOutlineText = () => {
     if (!outline) return;
-    // Parse text back to outline object to update structured state and history
-    const parsedOutline = parseOutlineTextToOutline(editableOutlineText, outline);
-    setOutline(parsedOutline);
-    addToHistory(parsedOutline);
+    
+    // Update raw content if we're working with markdown content
+    if (rawContent) {
+      setRawContent(editableOutlineText);
+      // Parse the content to update the outline structure
+      const parsedOutline = parseMarkdownContent(editableOutlineText);
+      setOutline(parsedOutline);
+      addToHistory(parsedOutline);
+    } else {
+      // Parse text back to outline object for structured content
+      const parsedOutline = parseOutlineTextToOutline(editableOutlineText, outline);
+      setOutline(parsedOutline);
+      addToHistory(parsedOutline);
+    }
+    
     setIsEditingOutline(false);
     setOriginalOutlineText(editableOutlineText);
     toast({
@@ -234,8 +270,8 @@ const OutlineEditor = () => {
     let textToCopy = '';
     if (viewMode === 'Markdown') {
       textToCopy = generateMarkdown(outline);
-    } else if (viewMode === 'Tree View') {
-      textToCopy = editableOutlineText;
+    } else if (viewMode === 'Blog View' && rawContent) {
+      textToCopy = generateMarkdownFromContent(rawContent);
     } else {
       textToCopy = editableOutlineText;
     }
@@ -283,6 +319,22 @@ const OutlineEditor = () => {
 
   let outlineView = null;
   switch (viewMode) {
+    case 'Blog View':
+      if (rawContent) {
+        const cleanedContent = generateMarkdownFromContent(rawContent);
+        outlineView = (
+          <div className="bg-white p-8 rounded-lg shadow-sm border border-border">
+            <BlogPostRenderer content={cleanedContent} />
+          </div>
+        );
+      } else {
+        outlineView = (
+          <div className="bg-white p-8 rounded-lg shadow-sm border border-border">
+            <BlogPostRenderer content={generateMarkdown(outline)} />
+          </div>
+        );
+      }
+      break;
     case 'Tree View':
       outlineView = renderTreeView(outline.sections);
       break;
@@ -393,7 +445,7 @@ const OutlineEditor = () => {
                   placeholder="Edit your outline content..."
                   className="font-mono text-base p-4 border border-border rounded"
                   isTextarea={true}
-                  rows={20}
+                  rows={25}
                 />
                 <div className="mt-4 flex space-x-4">
                   <Button onClick={saveEditedOutlineText}>Save</Button>
